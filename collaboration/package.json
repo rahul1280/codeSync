@@ -1,0 +1,21 @@
+{
+  "name": "codesync-collaboration",
+  "version": "1.0.0",
+  "description": "CodeSync Yjs Real-Time Collaboration WebSocket Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "npx nodemon server.js",
+    "test": "node test_runner.js"
+  },
+  "dependencies": {
+    "cookie": "^0.7.2",
+    "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.2",
+    "lib0": "^0.2.98",
+    "mongoose": "^8.10.1",
+    "ws": "^8.18.0",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.23"
+  }
+}
