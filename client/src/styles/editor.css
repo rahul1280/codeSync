@@ -271,6 +271,55 @@
   color: var(--accent-danger);
 }
 
+/* Interactive stdin input bar */
+.output-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+}
+
+.output-stdin-input {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.output-stdin-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.output-stdin-input::placeholder {
+  color: var(--text-muted);
+}
+
+.output-send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.output-send-btn:hover {
+  opacity: 0.85;
+}
+
 /* Status Bar */
 .editor-statusbar {
   height: 24px;

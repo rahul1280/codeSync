@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 const User = require('../models/User');
 const { registerChatHandlers } = require('./chatHandler');
+const { registerExecutionHandlers } = require('./executionHandler');
 
 function parseCookie(cookieString, cookieName) {
   if (!cookieString) return null;
@@ -66,6 +67,7 @@ function initSocket(server) {
 
   io.on('connection', (socket) => {
     registerChatHandlers(io, socket);
+    registerExecutionHandlers(io, socket);
   });
 
   return io;

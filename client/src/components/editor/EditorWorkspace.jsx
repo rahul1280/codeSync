@@ -12,7 +12,6 @@ import { useCollaboration } from '../../hooks/useCollaboration';
 import { useChat } from '../../hooks/useChat';
 import { useSocket } from '../../hooks/useSocket';
 import { fileApi } from '../../api/fileApi';
-import { executionApi } from '../../api/executionApi';
 import { aiApi } from '../../api/aiApi';
 import { useToast } from '../../context/ToastContext';
 
@@ -40,6 +39,7 @@ export default function EditorWorkspace({
   const [output, setOutput] = useState('');
   const [outputError, setOutputError] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [isInteractive, setIsInteractive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExplaining, setIsExplaining] = useState(false);
   const [executionTime, setExecutionTime] = useState(null);
@@ -216,21 +216,69 @@ export default function EditorWorkspace({
     }
   };
 
-  // Keyboard shortcut Ctrl+S
+  // Keyboard shortcut Ctrl+S (save) and Ctrl+Enter (run)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (!isRunning) handleRunCode();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeFileId, fileContents, canEdit]);
+  }, [activeFileId, fileContents, canEdit, isRunning]);
 
-  const handleRunCode = async () => {
+  // ─── Socket.IO execution event listeners ───
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleExecOutput = (data) => {
+      setOutput((prev) => prev + (data.text || ''));
+    };
+
+    const handleExecDone = (data) => {
+      setIsRunning(false);
+      setIsInteractive(false);
+      setExecutionTime(data.executionTime || null);
+      if (data.status === 'failed' && data.message) {
+        setOutput((prev) => prev + '\n' + data.message);
+      }
+    };
+
+    const handleExecError = (data) => {
+      setOutputError(data.message || 'Execution error');
+      setIsRunning(false);
+      setIsInteractive(false);
+    };
+
+    const handleExecStarted = () => {
+      setIsInteractive(true);
+    };
+
+    socket.on('exec:output', handleExecOutput);
+    socket.on('exec:done', handleExecDone);
+    socket.on('exec:error', handleExecError);
+    socket.on('exec:started', handleExecStarted);
+
+    return () => {
+      socket.off('exec:output', handleExecOutput);
+      socket.off('exec:done', handleExecDone);
+      socket.off('exec:error', handleExecError);
+      socket.off('exec:started', handleExecStarted);
+    };
+  }, [socket]);
+
+  const handleRunCode = () => {
     if (!activeFile) {
       toast.error('Select a file to run');
+      return;
+    }
+    if (!socket || !socket.connected) {
+      toast.error('Socket not connected. Please refresh and try again.');
       return;
     }
 
@@ -239,40 +287,36 @@ export default function EditorWorkspace({
       fileContents[activeFileId] ||
       activeFile.content ||
       '';
+
     setIsRunning(true);
+    setIsInteractive(true);
     setIsOutputOpen(true);
     setOutput('');
     setOutputError('');
     setExecutionTime(null);
 
-    const startTime = performance.now();
-    try {
-      const res = await executionApi.executeCode({
-        language: activeFile.language || 'javascript',
-        code: currentCode,
-      });
+    socket.emit('exec:start', {
+      language: activeFile.language || 'javascript',
+      code: currentCode,
+      roomId: roomId || undefined,
+      fileId: activeFileId || undefined,
+    });
+  };
 
-      const endTime = performance.now();
-      setExecutionTime(Math.round(endTime - startTime));
-
-      const execData = res?.execution || res || {};
-      const outputText = res?.output || res?.stdout || execData?.output || execData?.stdout || '';
-      const errorText = res?.error || res?.stderr || execData?.error || execData?.stderr || '';
-
-      if (errorText && errorText.trim()) {
-        setOutputError(errorText);
-      } else {
-        setOutput(
-          outputText && outputText.trim()
-            ? outputText
-            : 'Program executed successfully with no output.'
-        );
-      }
-    } catch (err) {
-      setOutputError(err.response?.data?.message || 'Execution failed. Check backend runtime.');
-    } finally {
-      setIsRunning(false);
+  const handleSendInput = (text) => {
+    if (socket && socket.connected) {
+      // Echo the input in the output panel
+      setOutput((prev) => prev + text + '\n');
+      socket.emit('exec:input', { text });
     }
+  };
+
+  const handleStopExecution = () => {
+    if (socket && socket.connected) {
+      socket.emit('exec:stop');
+    }
+    setIsRunning(false);
+    setIsInteractive(false);
   };
 
   const handleExplainCode = async () => {
@@ -401,6 +445,9 @@ export default function EditorWorkspace({
               error={outputError}
               loading={isRunning}
               executionTime={executionTime}
+              isInteractive={isInteractive}
+              onSendInput={handleSendInput}
+              onStopExecution={handleStopExecution}
               onClear={() => {
                 setOutput('');
                 setOutputError('');
